@@ -1,6 +1,6 @@
 import type { ContentBlock } from '@deepseek-ai/dsh-llm';
 import { FlowTextClient } from './client.js';
-import type { FlowTextRunPolicy } from './protocol.js';
+import type { FlowTextInteractionAnswer, FlowTextPendingApproval, FlowTextPendingInteraction, FlowTextRunPolicy } from './protocol.js';
 import { type FlowTextProgressMode } from './progress.js';
 export type FlowTextStopReason = 'completed' | 'aborted' | 'error';
 export interface FlowTextRunRequest {
@@ -17,6 +17,11 @@ export interface FlowTextRun {
     readonly progress: AsyncIterable<string>;
     readonly result: Promise<FlowTextRunResult>;
     dispose(): Promise<void>;
+}
+/** DSH-owned presentation channel for a FlowText interaction. */
+export interface FlowTextInteractionBridge {
+    ask(interaction: FlowTextPendingInteraction, signal: AbortSignal): Promise<readonly FlowTextInteractionAnswer[]>;
+    approve(approval: FlowTextPendingApproval, signal: AbortSignal): Promise<'once' | 'deny'>;
 }
 /** Fully resolved inputs for one remote FlowText run. */
 export interface FlowTextRunSpec {
@@ -41,4 +46,5 @@ export interface FlowTextRunSpec {
 export declare function startFlowTextRun(request: FlowTextRunRequest, spec: FlowTextRunSpec, context?: {
     readonly conversationId?: string;
     readonly vaultId?: string;
+    readonly interactions?: FlowTextInteractionBridge;
 }): Promise<FlowTextRun>;

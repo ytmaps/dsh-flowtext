@@ -71,13 +71,13 @@ export function summarizeFlowTextEvent(event: FlowTextTaskEvent): string | undef
     switch (data?.status) {
       case 'starting': return 'FlowText Agent 正在启动'
       case 'running': return 'FlowText Agent 已接管任务'
-      case 'waiting_input': return '等待在 FlowText 面板中补充信息'
-      case 'waiting_approval': return '等待在 FlowText 面板中确认操作'
+      case 'waiting_input': return 'FlowText 请求补充信息'
+      case 'waiting_approval': return 'FlowText 请求批准危险操作'
       default: return undefined
     }
   }
-  if (event.type === 'approval.requested') return '等待在 FlowText 面板中确认操作'
-  if (event.type === 'interaction.requested') return '等待在 FlowText 面板中补充信息'
+  if (event.type === 'approval.requested') return 'FlowText 请求批准危险操作'
+  if (event.type === 'interaction.requested') return 'FlowText 请求补充信息'
   if (event.type !== 'agent.update' || data === undefined) return undefined
   switch (data.type) {
     case 'phase': return PHASE_LABELS[boundedText(data.phase, 80).toLowerCase()]

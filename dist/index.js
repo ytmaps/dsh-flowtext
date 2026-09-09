@@ -4,8 +4,9 @@ import { FlowTextClient } from './client.js';
 import { FileCredentialStore } from './credentials.js';
 import { FLOWTEXT_DIRECT_MODEL, FLOWTEXT_DIRECT_PROVIDER, FlowTextDirectAdapter, } from './direct-adapter.js';
 import { FLOWTEXT_VAULT_MODEL_PREFIX, FlowTextGatewayDiscovery } from './registry.js';
+import { createFlowTextInteractionResolver } from './interactions.js';
 export const name = 'flowtext-direct';
-export const inject = ['llm'];
+export const inject = ['llm', 'agents', 'userQuestions', 'approval'];
 const DEFAULT_BASE_URL = 'http://127.0.0.1:27124/flowtext-agent/v1';
 export const Config = z.object({
     baseUrl: z.string(),
@@ -100,9 +101,8 @@ export function apply(ctx, config) {
             return { target, client: cached.client };
         },
     };
-    ctx.llm.registerAdapter([FLOWTEXT_DIRECT_PROVIDER], new FlowTextDirectAdapter(FLOWTEXT_DIRECT_PROVIDER, FLOWTEXT_DIRECT_MODEL, spec, targets));
-    const requestContext = ctx;
-    requestContext.on('agent/request', async (_payload, next) => {
+    ctx.llm.registerAdapter([FLOWTEXT_DIRECT_PROVIDER], new FlowTextDirectAdapter(FLOWTEXT_DIRECT_PROVIDER, FLOWTEXT_DIRECT_MODEL, spec, targets, createFlowTextInteractionResolver(ctx)));
+    ctx.on('agent/request', async (_payload, next) => {
         const current = await next();
         const { reasoningEffort: _reasoningEffort, ...withoutReasoningEffort } = current;
         const selectedFlowTextModel = current.provider === FLOWTEXT_DIRECT_PROVIDER
@@ -117,4 +117,5 @@ export function apply(ctx, config) {
     });
 }
 export { FLOWTEXT_DIRECT_MODEL, FLOWTEXT_DIRECT_PROVIDER, FlowTextDirectAdapter } from './direct-adapter.js';
+export { createFlowTextInteractionBridge, FlowTextInteractionCancelledError } from './interactions.js';
 //# sourceMappingURL=index.js.map

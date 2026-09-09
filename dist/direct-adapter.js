@@ -1,5 +1,5 @@
 import { LlmAdapter, } from '@deepseek-ai/dsh-llm';
-import { startFlowTextRun } from './run.js';
+import { startFlowTextRun, } from './run.js';
 /** Stable DSH route used when FlowText owns the whole task loop. */
 export const FLOWTEXT_DIRECT_PROVIDER = 'flowtext-direct';
 /** Display-only model id for the remote FlowText agent. */
@@ -37,12 +37,14 @@ export class FlowTextDirectAdapter extends LlmAdapter {
     model;
     spec;
     targets;
-    constructor(provider, model, spec, targets) {
+    interactions;
+    constructor(provider, model, spec, targets, interactions) {
         super();
         this.provider = provider;
         this.model = model;
         this.spec = spec;
         this.targets = targets;
+        this.interactions = interactions;
     }
     providerInfo(provider) {
         return { id: provider, name: 'FlowText Direct' };
@@ -91,6 +93,8 @@ export class FlowTextDirectAdapter extends LlmAdapter {
             throw new Error(`flowtext-direct: unsupported model ${options.model}`);
         }
         const signal = options.signal ?? new AbortController().signal;
+        const sessionId = options.sessionId === undefined ? undefined : String(options.sessionId);
+        const interactionBridge = sessionId === undefined ? undefined : this.interactions?.resolve(sessionId);
         const resolvedTarget = this.targets === undefined
             ? undefined
             : await this.targets.resolve(options.model, signal);
@@ -104,6 +108,7 @@ export class FlowTextDirectAdapter extends LlmAdapter {
         const run = await startFlowTextRun(request, runSpec, {
             ...(options.sessionId === undefined ? {} : { conversationId: String(options.sessionId) }),
             ...(resolvedTarget === undefined ? {} : { vaultId: resolvedTarget.target.vaultId }),
+            ...(interactionBridge === undefined ? {} : { interactions: interactionBridge }),
         });
         try {
             let progressText = '';

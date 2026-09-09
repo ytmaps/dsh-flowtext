@@ -6,7 +6,12 @@ import {
   type ResolvedRetryPolicy,
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
-import { startFlowTextRun, type FlowTextRunResult, type FlowTextRunSpec } from './run.js'
+import {
+  startFlowTextRun,
+  type FlowTextInteractionBridge,
+  type FlowTextRunResult,
+  type FlowTextRunSpec,
+} from './run.js'
 import type { FlowTextClient } from './client.js'
 import type { FlowTextGatewayTarget } from './registry.js'
 
@@ -18,6 +23,11 @@ export const FLOWTEXT_DIRECT_MODEL = 'flowtext-agent'
 export interface FlowTextDirectTargetResolver {
   list(): Promise<readonly FlowTextGatewayTarget[]>
   resolve(modelId: string, signal: AbortSignal): Promise<{ readonly target: FlowTextGatewayTarget; readonly client: FlowTextClient }>
+}
+
+/** Resolve the DSH interaction channel owned by one live Session. */
+export interface FlowTextInteractionResolver {
+  resolve(sessionId: string): FlowTextInteractionBridge
 }
 
 function latestUserTask(options: GenerateOptions): string {
@@ -53,6 +63,7 @@ export class FlowTextDirectAdapter extends LlmAdapter {
     private readonly model: string,
     private readonly spec: FlowTextRunSpec,
     private readonly targets?: FlowTextDirectTargetResolver,
+    private readonly interactions?: FlowTextInteractionResolver,
   ) {
     super()
   }
@@ -106,6 +117,8 @@ export class FlowTextDirectAdapter extends LlmAdapter {
       throw new Error(`flowtext-direct: unsupported model ${options.model}`)
     }
     const signal = options.signal ?? new AbortController().signal
+    const sessionId = options.sessionId === undefined ? undefined : String(options.sessionId)
+    const interactionBridge = sessionId === undefined ? undefined : this.interactions?.resolve(sessionId)
     const resolvedTarget = this.targets === undefined
       ? undefined
       : await this.targets.resolve(options.model, signal)
@@ -118,6 +131,7 @@ export class FlowTextDirectAdapter extends LlmAdapter {
     const run = await startFlowTextRun(request, runSpec, {
       ...(options.sessionId === undefined ? {} : { conversationId: String(options.sessionId) }),
       ...(resolvedTarget === undefined ? {} : { vaultId: resolvedTarget.target.vaultId }),
+      ...(interactionBridge === undefined ? {} : { interactions: interactionBridge }),
     })
     try {
       let progressText = ''

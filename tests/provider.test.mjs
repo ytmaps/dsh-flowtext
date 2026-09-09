@@ -11,6 +11,7 @@ import {
   FLOWTEXT_DIRECT_PROVIDER,
   FlowTextDirectAdapter,
   apply,
+  createFlowTextInteractionBridge,
 } from '../dist/index.js'
 import { startFlowTextRun } from '../dist/run.js'
 import {
@@ -446,7 +447,13 @@ test('direct run waits for FlowText UI clarification instead of cancelling it', 
   let cancelled = false
   const baseUrl = await gateway(async (req, res) => {
     if (req.method === 'POST' && req.url === '/flowtext-agent/v1/tasks') {
-      json(res, 202, { task: { taskId: 'flow-ui-input', clientId: 'test-harness', status, lastSeq: 3, pendingInteraction: { requestId: 'ask-ui-1' } } })
+      json(res, 202, { task: {
+        taskId: 'flow-ui-input', clientId: 'test-harness', status, lastSeq: 3,
+        pendingInteraction: {
+          requestId: 'ask-ui-1', kind: 'clarification', status: 'pending', createdAt: 1,
+          questions: [{ id: 'target', question: '选择目标', options: [], required: true }],
+        },
+      } })
       return
     }
     if (req.url.includes('/events?')) {
@@ -475,6 +482,104 @@ test('direct run waits for FlowText UI clarification instead of cancelling it', 
     stopReason: 'completed',
   })
   assert.equal(cancelled, false)
+})
+
+test('direct run presents a FlowText clarification in DSH and posts the structured answer', async () => {
+  let status = 'waiting_input'
+  let posted
+  const interaction = {
+    requestId: 'ask-dsh-1', kind: 'clarification', status: 'pending', createdAt: 1,
+    questions: [{
+      id: 'mode', question: '选择模式', options: [{ id: 'safe', label: '安全模式' }],
+      multiSelect: false, allowFreeText: false, required: true,
+    }],
+  }
+  const baseUrl = await gateway(async (req, res) => {
+    if (req.method === 'POST' && req.url === '/flowtext-agent/v1/tasks') {
+      const chunks = []
+      for await (const chunk of req) chunks.push(chunk)
+      assert.equal(JSON.parse(Buffer.concat(chunks).toString('utf8')).interactionMode, 'gateway_client')
+      json(res, 202, { task: { taskId: 'flow-dsh-input', clientId: 'test-harness', status, lastSeq: 2, pendingInteraction: interaction } })
+      return
+    }
+    if (req.method === 'POST' && req.url.endsWith('/interactions/ask-dsh-1/answer')) {
+      const chunks = []
+      for await (const chunk of req) chunks.push(chunk)
+      posted = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+      status = 'completed'
+      json(res, 202, { task: { taskId: 'flow-dsh-input', status: 'queued', lastSeq: 4 } })
+      return
+    }
+    if (req.url.includes('/events?')) {
+      json(res, 200, {
+        taskId: 'flow-dsh-input', lastSeq: 4,
+        events: [{ taskId: 'flow-dsh-input', seq: 4, type: 'interaction.answered', timestamp: 1 }],
+      })
+      return
+    }
+    if (req.url === '/flowtext-agent/v1/tasks/flow-dsh-input') {
+      json(res, 200, { task: {
+        taskId: 'flow-dsh-input', clientId: 'test-harness', status, lastSeq: 5,
+        result: { success: true, answer: '已根据回答完成' },
+      } })
+      return
+    }
+    throw new Error(`unexpected route ${req.method} ${req.url}`)
+  })
+  const run = await startFlowTextRun(request(), runSpec(client(baseUrl)), {
+    interactions: {
+      async ask(value) {
+        assert.equal(value.requestId, 'ask-dsh-1')
+        return [{ questionId: 'mode', selectedOptionIds: ['safe'] }]
+      },
+      async approve() { throw new Error('unexpected approval') },
+    },
+  })
+  assert.equal((await run.result).stopReason, 'completed')
+  assert.deepEqual(posted, { answers: [{ questionId: 'mode', selectedOptionIds: ['safe'] }] })
+})
+
+test('DSH interaction bridge maps labels to FlowText option ids and re-prompts a skipped required question', async () => {
+  const requests = []
+  let calls = 0
+  const agent = {}
+  const bridge = createFlowTextInteractionBridge({
+    userQuestions: {
+      async ask(value) {
+        requests.push(value)
+        calls += 1
+        return calls === 1
+          ? { answers: [{ id: 'choice', selected: [] }] }
+          : { answers: [{ id: 'choice', selected: ['允许（推荐）'] }] }
+      },
+    },
+    approval: { async request() { return 'allowed-once' } },
+  }, agent)
+  const answers = await bridge.ask({
+    requestId: 'ask-map', kind: 'clarification', status: 'pending', createdAt: 1,
+    questions: [{
+      id: 'choice', question: '是否继续', required: true, allowFreeText: false,
+      options: [{ id: 'allow-id', label: '允许', recommended: true }],
+    }],
+  }, new AbortController().signal)
+  assert.equal(requests.length, 2)
+  assert.match(requests[1].questions[0].detail, /请先回答/)
+  assert.deepEqual(answers, [{ questionId: 'choice', selectedOptionIds: ['allow-id'] }])
+})
+
+test('DSH native approval grants only the current FlowText operation', async () => {
+  let approvalRequest
+  const agent = {}
+  const bridge = createFlowTextInteractionBridge({
+    userQuestions: { async ask() { throw new Error('unexpected question') } },
+    approval: { async request(value) { approvalRequest = value; return 'allowed-once' } },
+  }, agent)
+  const decision = await bridge.approve({
+    requestId: 'approval-1', kind: 'dangerous_cli', command: 'rm one-file.tmp',
+  }, new AbortController().signal)
+  assert.equal(decision, 'once')
+  assert.equal(approvalRequest.agent, agent)
+  assert.equal(approvalRequest.reason, 'rm one-file.tmp')
 })
 
 test('request cancellation cancels the remote task and dispose reaches settlement', async () => {

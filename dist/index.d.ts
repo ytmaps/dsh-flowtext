@@ -31,3 +31,4 @@ export type { FlowTextProgressMode } from './progress.js';
 export type { FlowTextRunPolicy } from './protocol.js';
 export type { FlowTextCredentialStore } from './credentials.js';
 export { FLOWTEXT_DIRECT_MODEL, FLOWTEXT_DIRECT_PROVIDER, FlowTextDirectAdapter } from './direct-adapter.js';
+export { createFlowTextInteractionBridge, FlowTextInteractionCancelledError } from './interactions.js';

@@ -43,6 +43,7 @@ export interface FlowTextCreateTaskRequest {
   readonly vaultId?: string
   readonly conversationId?: string
   readonly presentation?: 'background' | 'agent_view'
+  readonly interactionMode?: 'flowtext_ui' | 'gateway_client'
   readonly goal: string
   readonly modelId?: string
   readonly context?: FlowTextTaskContext
@@ -55,6 +56,44 @@ export interface FlowTextPendingApproval {
   readonly requestId: string
   readonly kind: 'dangerous_cli' | 'external_action'
   readonly command: string
+  readonly action?: unknown
+}
+
+/** One option in a pending FlowText clarification. */
+export interface FlowTextPendingInteractionOption {
+  readonly id: string
+  readonly label: string
+  readonly description?: string
+  readonly recommended?: boolean
+}
+
+/** One question in a pending FlowText clarification. */
+export interface FlowTextPendingInteractionQuestion {
+  readonly id: string
+  readonly question: string
+  readonly header?: string
+  readonly detail?: string
+  readonly options: readonly FlowTextPendingInteractionOption[]
+  readonly multiSelect?: boolean
+  readonly allowFreeText?: boolean
+  readonly required?: boolean
+}
+
+/** A clarification durably owned by one FlowText task. */
+export interface FlowTextPendingInteraction {
+  readonly requestId: string
+  readonly kind: 'clarification'
+  readonly status: 'pending'
+  readonly questions: readonly FlowTextPendingInteractionQuestion[]
+  readonly createdAt: number
+  readonly turn?: number
+}
+
+/** One answer accepted by the FlowText interaction endpoint. */
+export interface FlowTextInteractionAnswer {
+  readonly questionId: string
+  readonly selectedOptionIds: readonly string[]
+  readonly customText?: string
 }
 
 /** Terminal task result persisted by FlowText. */
@@ -70,11 +109,12 @@ export interface FlowTextTaskSnapshot {
   readonly requestId?: string
   readonly conversationId?: string
   readonly presentation?: 'background' | 'agent_view'
+  readonly interactionMode?: 'flowtext_ui' | 'gateway_client'
   readonly status: FlowTextTaskStatus
   readonly lastSeq: number
   readonly result?: FlowTextTaskResult
   readonly error?: { readonly code: string; readonly message: string }
-  readonly pendingInteraction?: { readonly requestId: string }
+  readonly pendingInteraction?: FlowTextPendingInteraction
   readonly pendingApproval?: FlowTextPendingApproval
 }
 

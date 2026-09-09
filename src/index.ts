@@ -1,6 +1,9 @@
 /** DeepSeek Harness direct FlowText Agent adapter. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-user-approval'
+import type {} from '@deepseek-ai/dsh-user-questions'
 import z from '@deepseek-ai/schemastery'
 import { FlowTextClient } from './client.js'
 import { FileCredentialStore } from './credentials.js'
@@ -12,9 +15,10 @@ import {
 import type { FlowTextProgressMode } from './progress.js'
 import { FLOWTEXT_VAULT_MODEL_PREFIX, FlowTextGatewayDiscovery } from './registry.js'
 import type { FlowTextRunSpec } from './run.js'
+import { createFlowTextInteractionResolver } from './interactions.js'
 
 export const name = 'flowtext-direct'
-export const inject = ['llm']
+export const inject = ['llm', 'agents', 'userQuestions', 'approval']
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:27124/flowtext-agent/v1'
 
@@ -71,16 +75,6 @@ function assertPositiveInteger(name: string, value: number, maximum: number): vo
   if (!Number.isSafeInteger(value) || value <= 0 || value > maximum) {
     throw new Error(`dsh-flowtext: ${name} must be a positive safe integer no greater than ${maximum}`)
   }
-}
-
-interface AgentRequestContext {
-  on(
-    event: 'agent/request',
-    listener: (
-      payload: { signal: AbortSignal },
-      next: () => Promise<import('@deepseek-ai/dsh-llm').LlmCallConfig>,
-    ) => Promise<import('@deepseek-ai/dsh-llm').LlmCallConfig>,
-  ): () => void
 }
 
 /** Register the only execution route: FlowText Agent direct mode. */
@@ -155,11 +149,16 @@ export function apply(ctx: Context, config: Config): void {
   }
   ctx.llm.registerAdapter(
     [FLOWTEXT_DIRECT_PROVIDER],
-    new FlowTextDirectAdapter(FLOWTEXT_DIRECT_PROVIDER, FLOWTEXT_DIRECT_MODEL, spec, targets),
+    new FlowTextDirectAdapter(
+      FLOWTEXT_DIRECT_PROVIDER,
+      FLOWTEXT_DIRECT_MODEL,
+      spec,
+      targets,
+      createFlowTextInteractionResolver(ctx),
+    ),
   )
 
-  const requestContext = ctx as unknown as AgentRequestContext
-  requestContext.on('agent/request', async (_payload, next) => {
+  ctx.on('agent/request', async (_payload, next) => {
     const current = await next()
     const { reasoningEffort: _reasoningEffort, ...withoutReasoningEffort } = current
     const selectedFlowTextModel = current.provider === FLOWTEXT_DIRECT_PROVIDER
@@ -179,3 +178,4 @@ export type { FlowTextProgressMode } from './progress.js'
 export type { FlowTextRunPolicy } from './protocol.js'
 export type { FlowTextCredentialStore } from './credentials.js'
 export { FLOWTEXT_DIRECT_MODEL, FLOWTEXT_DIRECT_PROVIDER, FlowTextDirectAdapter } from './direct-adapter.js'
+export { createFlowTextInteractionBridge, FlowTextInteractionCancelledError } from './interactions.js'

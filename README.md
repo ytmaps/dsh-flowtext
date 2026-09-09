@@ -42,7 +42,10 @@ When upgrading from `dsh-subagent-flowtext`, remove the old package before insta
 - The same DSH `sessionId` reuses one persistent FlowText conversation and Agent panel.
 - Different DSH sessions receive independent FlowText Agent panels.
 - The complete trajectory is shown in FlowText; DSH receives a sanitized compact trace and the final answer.
-- Clarification and dangerous-operation approval pause DSH until handled in FlowText UI.
+- FlowText clarifications use DSH's native Session-scoped question composer and return structured choices or free text to the original FlowText task.
+- Dangerous FlowText operations use DSH's native approval card. The remote route intentionally exposes only allow-once and reject, never a task-wide grant.
+- The FlowText UI keeps showing the complete run and pending request, but DSH-owned interaction controls are read-only there to prevent competing answers.
+- Human interaction time does not consume the FlowText Agent execution timeout.
 - DSH model retries are disabled to prevent duplicate write tasks.
 
 ## Configuration
@@ -68,6 +71,6 @@ When upgrading from `dsh-subagent-flowtext`, remove the old package before insta
 
 ## Security
 
-The Gateway accepts loopback endpoints only. Vault discovery records contain only identity, display name, path, and dynamic port, use owner-only local files, and never contain tokens. Automatic pairing rejects browser origins and requires explicit authorization in Obsidian. Credentials are isolated per vault and never enter the Profile, Obsidian vault, shell history, or model context. Cancelling the parent request or disposing the DSH run cancels the matching FlowText task.
+The Gateway accepts loopback endpoints only. Vault discovery records contain only identity, display name, path, and dynamic port, use owner-only local files, and never contain tokens. Automatic pairing rejects browser origins and requires explicit authorization in Obsidian. Credentials are isolated per vault and never enter the Profile, Obsidian vault, shell history, or model context. Clarification and approval use DSH's Agent-scoped interaction services directly: they do not create another DSH model turn and their answers are not sent to the DSH model. Cancelling the parent request or disposing the DSH run cancels the matching FlowText task.
 
 Only text instructions and text terminal answers are currently supported; images and structured output are not forwarded from DSH.

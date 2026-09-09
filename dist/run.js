@@ -69,6 +69,12 @@ function reportError(spec, error) {
         // A diagnostic sink is observational and cannot change run settlement.
     }
 }
+function isInteractionCancellation(error) {
+    return typeof error === 'object'
+        && error !== null
+        && 'code' in error
+        && error.code === 'FLOWTEXT_INTERACTION_CANCELLED';
+}
 function taskStopReason(task) {
     switch (task.status) {
         case 'completed': return 'completed';
@@ -94,17 +100,48 @@ function taskResult(task, maxAnswerBytes) {
     const detail = task.error ? `${task.error.code}: ${task.error.message}` : `FlowText task ended with status ${task.status}`;
     return failedResult(reason === 'completed' ? 'error' : reason, safeDiagnostic(detail), output);
 }
-async function waitForTerminal(task, spec, signal, progress) {
+async function waitForTerminal(task, spec, signal, progress, interactions) {
     let snapshot = task;
     // Task startup can emit several UI updates before POST /tasks returns. In
     // summary mode replay the bounded task event buffer from seq 0 so those
     // early phases are visible instead of silently becoming a black box.
     let after = spec.progressMode === 'summary' ? 0 : task.lastSeq;
     while (!TERMINAL_STATUSES.has(snapshot.status)) {
+        if (snapshot.status === 'waiting_input' && interactions !== undefined) {
+            const interaction = snapshot.pendingInteraction;
+            if (interaction === undefined)
+                throw new Error('FLOWTEXT_INVALID_INTERACTION: task is waiting without question details');
+            progress.push('FlowText 请求补充信息');
+            const answers = await interactions.ask(interaction, signal);
+            await spec.client.answerInteraction(snapshot.taskId, interaction.requestId, answers, signal);
+            progress.push('已将回答发送给 FlowText，继续执行');
+            const resumedEvents = await spec.client.waitForEvents(snapshot.taskId, after, signal);
+            if (spec.progressMode === 'summary') {
+                for (const event of resumedEvents.events)
+                    progress.push(summarizeFlowTextEvent(event));
+            }
+            after = Math.max(after, resumedEvents.lastSeq);
+            snapshot = await spec.client.getTask(snapshot.taskId, signal);
+            continue;
+        }
         if (snapshot.status === 'waiting_approval') {
             const approval = snapshot.pendingApproval;
             if (approval === undefined)
                 throw new Error('FLOWTEXT_INVALID_APPROVAL: task is waiting without approval details');
+            if (interactions !== undefined) {
+                progress.push('FlowText 请求批准危险操作');
+                const decision = await interactions.approve(approval, signal);
+                await spec.client.resolveApproval(snapshot.taskId, approval.requestId, decision, signal);
+                progress.push(decision === 'once' ? '危险操作已允许一次' : '危险操作已拒绝');
+                const resumedEvents = await spec.client.waitForEvents(snapshot.taskId, after, signal);
+                if (spec.progressMode === 'summary') {
+                    for (const event of resumedEvents.events)
+                        progress.push(summarizeFlowTextEvent(event));
+                }
+                after = Math.max(after, resumedEvents.lastSeq);
+                snapshot = await spec.client.getTask(snapshot.taskId, signal);
+                continue;
+            }
         }
         const events = await spec.client.waitForEvents(snapshot.taskId, after, signal);
         if (spec.progressMode === 'summary') {
@@ -136,6 +173,7 @@ export async function startFlowTextRun(request, spec, context = {}) {
         ...(context.vaultId === undefined ? {} : { vaultId: context.vaultId }),
         conversationId,
         presentation: 'agent_view',
+        interactionMode: context.interactions === undefined ? 'flowtext_ui' : 'gateway_client',
         goal,
         ...(spec.modelId === undefined ? {} : { modelId: spec.modelId }),
         context: {
@@ -162,16 +200,18 @@ export async function startFlowTextRun(request, spec, context = {}) {
     if (request.signal.aborted)
         void cancel();
     let settled = false;
-    const result = waitForTerminal(initial, spec, controller.signal, progress)
+    const result = waitForTerminal(initial, spec, controller.signal, progress, context.interactions)
         .then(task => {
         if (spec.progressMode === 'summary')
             progress.push(summarizeTerminalTask(task));
         return taskResult(task, spec.maxAnswerBytes);
     })
         .catch(async (error) => {
-        if (controller.signal.aborted || request.signal.aborted) {
+        if (controller.signal.aborted || request.signal.aborted || isInteractionCancellation(error)) {
             await cancel();
-            return failedResult('aborted', 'FlowText task was cancelled');
+            return failedResult('aborted', isInteractionCancellation(error)
+                ? 'FlowText interaction was cancelled in DeepSeek Harness'
+                : 'FlowText task was cancelled');
         }
         const normalized = error instanceof Error ? error : new Error(String(error));
         reportError(spec, normalized);

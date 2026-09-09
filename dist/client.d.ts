@@ -1,4 +1,4 @@
-import type { FlowTextCreateTaskRequest, FlowTextEventsResponse, FlowTextTaskSnapshot } from './protocol.js';
+import type { FlowTextCreateTaskRequest, FlowTextEventsResponse, FlowTextInteractionAnswer, FlowTextTaskSnapshot } from './protocol.js';
 import type { FlowTextCredentialStore } from './credentials.js';
 /** HTTP client configuration after plugin defaults are resolved. */
 export interface FlowTextClientOptions {
@@ -38,6 +38,8 @@ export declare class FlowTextClient {
     waitForEvents(taskId: string, after: number, signal: AbortSignal): Promise<FlowTextEventsResponse>;
     /** Request cancellation with an operation-owned timeout. */
     cancelTask(taskId: string): Promise<void>;
+    /** Answer a pending FlowText clarification. */
+    answerInteraction(taskId: string, requestId: string, answers: readonly FlowTextInteractionAnswer[], signal: AbortSignal): Promise<void>;
     /** Resolve a pending FlowText approval. */
     resolveApproval(taskId: string, requestId: string, decision: 'once' | 'session' | 'deny', signal: AbortSignal): Promise<void>;
     private request;

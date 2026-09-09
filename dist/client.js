@@ -57,6 +57,16 @@ function assertTask(value) {
             throw new FlowTextClientError('FlowText pending approval is invalid', 'INVALID_RESPONSE');
         }
     }
+    if (value.pendingInteraction !== undefined) {
+        assertRecord(value.pendingInteraction, 'FlowText pending interaction');
+        if (typeof value.pendingInteraction.requestId !== 'string'
+            || value.pendingInteraction.requestId.length === 0
+            || value.pendingInteraction.kind !== 'clarification'
+            || value.pendingInteraction.status !== 'pending'
+            || !Array.isArray(value.pendingInteraction.questions)) {
+            throw new FlowTextClientError('FlowText pending interaction is invalid', 'INVALID_RESPONSE');
+        }
+    }
     return value;
 }
 function assertLoopbackBaseUrl(value) {
@@ -254,6 +264,10 @@ export class FlowTextClient {
     /** Request cancellation with an operation-owned timeout. */
     async cancelTask(taskId) {
         await this.request('POST', `/tasks/${encodeURIComponent(taskId)}/cancel`, {}, AbortSignal.timeout(this.options.requestTimeoutMs));
+    }
+    /** Answer a pending FlowText clarification. */
+    async answerInteraction(taskId, requestId, answers, signal) {
+        await this.request('POST', `/tasks/${encodeURIComponent(taskId)}/interactions/${encodeURIComponent(requestId)}/answer`, { answers }, signal);
     }
     /** Resolve a pending FlowText approval. */
     async resolveApproval(taskId, requestId, decision, signal) {

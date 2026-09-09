@@ -40,7 +40,10 @@ dsh plugin --profile web add github:ytmaps/dsh-flowtext
 - 相同 DSH `sessionId` 复用同一个 FlowText 会话；不同 DSH 会话仍独立保存，但会优先复用已打开的空闲 Agent 面板。
 - FlowText UI 显示完整执行过程；DSH 通过可折叠的 reasoning 区域实时显示脱敏执行摘要。
 - 轨迹不会生成 DSH 工具调用，DSH 不会重复执行 FlowText 工具。
-- FlowText UI 中的追问和危险操作审批会暂停 DSH，直到用户完成交互。
+- FlowText 追问通过 DSH 原生问题卡片显示；单选、多选和自由文本回答会结构化回传给原 FlowText 任务。
+- FlowText 危险操作使用 DSH 原生审批卡片；远程通道只支持“允许一次”和“拒绝”，不扩大为整个任务授权。
+- DSH 追问/审批期间 FlowText UI 保留完整过程与待处理内容，但回答控件为只读，避免两个界面竞态作答。
+- 人工等待时间不计入 FlowText Agent 执行超时。
 - 适配器禁用 DSH 模型重试，避免包含写操作的任务被重复执行。
 
 ## 配置
@@ -66,6 +69,6 @@ dsh plugin --profile web add github:ytmaps/dsh-flowtext
 
 ## 安全边界
 
-Gateway 只接受回环地址。仓库发现记录仅包含仓库标识、显示名、路径和动态端口，使用仅当前用户可读的本地文件，不包含 Token。自动配对拒绝浏览器来源并要求用户在 Obsidian 明确允许。凭据按仓库隔离，不会写入 Profile、Obsidian 仓库、Shell 历史或模型上下文。父请求取消或 DSH 关闭 Run 时，插件会取消对应的 FlowText 任务。
+Gateway 只接受回环地址。仓库发现记录仅包含仓库标识、显示名、路径和动态端口，使用仅当前用户可读的本地文件，不包含 Token。自动配对拒绝浏览器来源并要求用户在 Obsidian 明确允许。凭据按仓库隔离，不会写入 Profile、Obsidian 仓库、Shell 历史或模型上下文。追问和审批直接使用 DSH 的 Agent-scoped 交互通道，不会生成新的 DSH 模型轮次，回答也不会发给 DSH 模型。父请求取消或 DSH 关闭 Run 时，插件会取消对应的 FlowText 任务。
 
 目前只支持文本指令和文本最终答案；图片及结构化输出不会从 DSH 转发。

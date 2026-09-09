@@ -1,12 +1,12 @@
 /** DeepSeek Harness direct FlowText Agent adapter. */
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
-import type { FlowTextRunPolicy } from './protocol.js';
 import type { FlowTextProgressMode } from './progress.js';
 export declare const name = "flowtext-direct";
 export declare const inject: string[];
 export interface Config {
     baseUrl?: string;
+    registryDir?: string;
     token?: string;
     autoPair?: boolean;
     credentialPath?: string;
@@ -15,7 +15,6 @@ export interface Config {
     modelId?: string;
     activePath?: string;
     contextPaths?: string[];
-    policy?: FlowTextRunPolicy;
     runOptions?: Record<string, unknown>;
     requestTimeoutMs?: number;
     longPollMs?: number;

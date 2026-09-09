@@ -40,4 +40,5 @@ export interface FlowTextRunSpec {
  */
 export declare function startFlowTextRun(request: FlowTextRunRequest, spec: FlowTextRunSpec, context?: {
     readonly conversationId?: string;
+    readonly vaultId?: string;
 }): Promise<FlowTextRun>;

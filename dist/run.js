@@ -133,6 +133,7 @@ export async function startFlowTextRun(request, spec, context = {}) {
     const initial = await spec.client.createTask({
         clientId: spec.clientId,
         requestId,
+        ...(context.vaultId === undefined ? {} : { vaultId: context.vaultId }),
         conversationId,
         presentation: 'agent_view',
         goal,

@@ -36,11 +36,13 @@ export class FlowTextDirectAdapter extends LlmAdapter {
     provider;
     model;
     spec;
-    constructor(provider, model, spec) {
+    targets;
+    constructor(provider, model, spec, targets) {
         super();
         this.provider = provider;
         this.model = model;
         this.spec = spec;
+        this.targets = targets;
     }
     providerInfo(provider) {
         return { id: provider, name: 'FlowText Direct' };
@@ -56,6 +58,23 @@ export class FlowTextDirectAdapter extends LlmAdapter {
         };
     }
     async listModels(provider) {
+        if (this.targets !== undefined) {
+            const targets = await this.targets.list();
+            if (targets.length > 0) {
+                const nameCounts = new Map();
+                for (const target of targets)
+                    nameCounts.set(target.vaultName, (nameCounts.get(target.vaultName) ?? 0) + 1);
+                return targets.map(target => ({
+                    provider,
+                    id: target.modelId,
+                    name: `FlowText Agent · ${target.vaultName}`,
+                    description: (nameCounts.get(target.vaultName) ?? 0) > 1 && target.vaultPath
+                        ? `FlowText 仓库：${target.vaultPath}`
+                        : `FlowText 仓库：${target.vaultName}`,
+                    inputModalities: ['text'],
+                }));
+            }
+        }
         return [{
                 provider,
                 id: this.model,
@@ -68,16 +87,23 @@ export class FlowTextDirectAdapter extends LlmAdapter {
         if (options.provider !== this.provider) {
             throw new Error(`flowtext-direct: unexpected provider route ${options.provider}`);
         }
-        if (options.model !== this.model) {
+        if (this.targets === undefined && options.model !== this.model) {
             throw new Error(`flowtext-direct: unsupported model ${options.model}`);
         }
         const signal = options.signal ?? new AbortController().signal;
+        const resolvedTarget = this.targets === undefined
+            ? undefined
+            : await this.targets.resolve(options.model, signal);
+        if (resolvedTarget !== undefined)
+            await resolvedTarget.client.verifyVault(resolvedTarget.target.vaultId, signal);
+        const runSpec = resolvedTarget === undefined ? this.spec : { ...this.spec, client: resolvedTarget.client };
         const request = {
             prompt: [{ type: 'text', text: latestUserTask(options) }],
             signal,
         };
-        const run = await startFlowTextRun(request, this.spec, {
+        const run = await startFlowTextRun(request, runSpec, {
             ...(options.sessionId === undefined ? {} : { conversationId: String(options.sessionId) }),
+            ...(resolvedTarget === undefined ? {} : { vaultId: resolvedTarget.target.vaultId }),
         });
         try {
             let progressText = '';

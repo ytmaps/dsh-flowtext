@@ -13,6 +13,7 @@ export interface FlowTextClientOptions {
   readonly autoPair?: boolean
   readonly clientId?: string
   readonly clientName?: string
+  readonly expectedVaultId?: string
   readonly credentialStore?: FlowTextCredentialStore
   readonly requestTimeoutMs: number
   readonly longPollMs: number
@@ -152,6 +153,29 @@ export class FlowTextClient {
     this.token = options.token
   }
 
+  /** Verify that a discovered loopback endpoint still belongs to the selected vault. */
+  async verifyVault(vaultId: string, signal: AbortSignal): Promise<void> {
+    const timeout = AbortSignal.timeout(this.options.requestTimeoutMs)
+    let response: Response
+    try {
+      response = await fetch(`${this.baseUrl}/health`, {
+        method: 'GET',
+        headers: { accept: 'application/json' },
+        signal: AbortSignal.any([signal, timeout]),
+      })
+    } catch (error: unknown) {
+      if (signal.aborted) throw new FlowTextClientError('FlowText vault verification was aborted', 'ABORTED')
+      if (timeout.aborted) throw new FlowTextClientError('FlowText vault verification timed out', 'REQUEST_TIMEOUT')
+      throw new FlowTextClientError('The selected FlowText vault is offline', 'VAULT_OFFLINE')
+    }
+    const payload = await readJson(response, this.options.maxResponseBytes)
+    if (!response.ok) throw new FlowTextClientError(`FlowText health check returned HTTP ${response.status}`, 'VAULT_OFFLINE', response.status)
+    assertRecord(payload, 'FlowText health response')
+    if (payload.protocol !== 'flowtext-agent/v1' || payload.vaultId !== vaultId) {
+      throw new FlowTextClientError('The selected FlowText endpoint belongs to a different vault', 'VAULT_MISMATCH')
+    }
+  }
+
   private async acquireToken(signal: AbortSignal): Promise<string> {
     if (this.token !== undefined) return this.token
     this.resolvingToken ??= (async () => {
@@ -181,6 +205,7 @@ export class FlowTextClient {
         body: JSON.stringify({
           clientId: this.options.clientId ?? 'deepseek-harness',
           clientName: this.options.clientName ?? 'DeepSeek Harness',
+          ...(this.options.expectedVaultId === undefined ? {} : { vaultId: this.options.expectedVaultId }),
         }),
         signal: AbortSignal.any([signal, timeout]),
       })

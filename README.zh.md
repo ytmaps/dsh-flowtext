@@ -25,13 +25,16 @@ dsh plugin --profile web add github:ytmaps/dsh-subagent-flowtext
   name: dsh-subagent-flowtext
 ```
 
-无需环境变量、复制 Token 或手工编辑 Profile。首次提交任务时，FlowText 会显示本机连接确认；允许一次后，凭据保存在 DSH 本地凭据目录中并自动复用。
+无需环境变量、复制 Token 或手工编辑 Profile。FlowText 会自动注册每个已打开的仓库；首次向某个仓库提交任务时，FlowText 会显示本机连接确认。允许一次后，DSH 会按仓库分别保存凭据并自动复用。
 
 升级前若安装过 `0.4.x` 或更早版本，请先删除旧包再重新添加，以清除旧版产生的 `subagent-flowtext` 和 `tool-subagent-flowtext` 配置条目。
 
 ## 运行方式
 
-- 插件固定把 DSH Agent 请求路由到 `flowtext-direct / flowtext-agent`。
+- 插件固定把 DSH Agent 请求路由到 `flowtext-direct`。
+- 只打开一个 FlowText 仓库时自动选中；同时打开多个仓库时，DSH 模型列表会显示 `FlowText Agent · 仓库名`，用户在提交前选择目标仓库。
+- 每次任务都会携带 Obsidian 官方维护的稳定仓库 ID；FlowText 执行前再次校验，不会因动态端口变化误投到其他仓库。
+- 第一个 Gateway 优先使用 `127.0.0.1:27124`；其他同时打开的仓库自动使用空闲动态端口，无需用户配置。
 - 只发送最新一条真实用户消息和 DSH `sessionId`。
 - 不向 FlowText 发送 DSH 系统提示、工具目录、助手历史或插件上下文。
 - 相同 DSH `sessionId` 复用同一个 FlowText 会话；不同 DSH 会话仍独立保存，但会优先复用已打开的空闲 Agent 面板。
@@ -44,7 +47,8 @@ dsh plugin --profile web add github:ytmaps/dsh-subagent-flowtext
 
 | 字段 | 默认值 | 含义 |
 |---|---:|---|
-| `baseUrl` | `http://127.0.0.1:27124/flowtext-agent/v1` | FlowText Gateway 地址，只允许本机 HTTP。 |
+| `baseUrl` | 未设置 | 默认自动发现所有已打开仓库；仅在兼容旧版 FlowText 时手工指定本机 Gateway 地址。 |
+| `registryDir` | `~/.flowtext/agent-gateways` | 可选的高级发现目录覆盖。 |
 | `autoPair` | `true` | 无本机凭据时自动请求 FlowText 授权。 |
 | `credentialPath` | DSH 凭据目录 | 可选凭据文件路径。 |
 | `clientName` | `DeepSeek Harness` | FlowText 配对框显示名称。 |
@@ -52,7 +56,6 @@ dsh plugin --profile web add github:ytmaps/dsh-subagent-flowtext
 | `modelId` | 未设置 | 可选 FlowText 模型。 |
 | `activePath` | 未设置 | 可选库内活动笔记路径。 |
 | `contextPaths` | `[]` | 可选库内上下文路径。 |
-| `policy` | `{}` | 请求权限；FlowText 前台策略仍是最终权限来源。 |
 | `runOptions` | `{}` | `thinkingEnabled` 等 FlowText 运行参数。 |
 | `requestTimeoutMs` | `30000` | 普通 HTTP 请求超时。 |
 | `longPollMs` | `25000` | Gateway 事件长轮询时间。 |
@@ -63,6 +66,6 @@ dsh plugin --profile web add github:ytmaps/dsh-subagent-flowtext
 
 ## 安全边界
 
-Gateway 只接受回环地址，自动配对拒绝浏览器来源并要求用户在 Obsidian 明确允许。凭据不会写入 Profile、仓库、Shell 历史或模型上下文。父请求取消或 DSH 关闭 Run 时，插件会取消对应的 FlowText 任务。
+Gateway 只接受回环地址。仓库发现记录仅包含仓库标识、显示名、路径和动态端口，使用仅当前用户可读的本地文件，不包含 Token。自动配对拒绝浏览器来源并要求用户在 Obsidian 明确允许。凭据按仓库隔离，不会写入 Profile、Obsidian 仓库、Shell 历史或模型上下文。父请求取消或 DSH 关闭 Run 时，插件会取消对应的 FlowText 任务。
 
 目前只支持文本指令和文本最终答案；图片及结构化输出不会从 DSH 转发。

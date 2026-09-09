@@ -1,11 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-function defaultCredentialPath() {
+import { basename, dirname, extname, join, resolve } from 'node:path';
+function safeScope(value) {
+    return value.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 128);
+}
+function defaultCredentialPath(scope) {
     const dshHome = process.env.DSH_HOME?.trim();
     const root = dshHome ? resolve(dshHome) : join(homedir(), '.dsh');
-    return join(root, 'credentials', 'dsh-subagent-flowtext.json');
+    return scope
+        ? join(root, 'credentials', 'dsh-subagent-flowtext', `${safeScope(scope)}.json`)
+        : join(root, 'credentials', 'dsh-subagent-flowtext.json');
 }
 function validToken(value) {
     return typeof value === 'string' && value.length >= 24 && value.length <= 4096;
@@ -13,13 +18,25 @@ function validToken(value) {
 /** Mode-0600 local credential file, separate from profile configuration and repositories. */
 export class FileCredentialStore {
     path;
-    constructor(path = defaultCredentialPath()) {
-        this.path = resolve(path);
+    scope;
+    constructor(path, scope) {
+        this.scope = scope;
+        if (path && scope) {
+            const base = resolve(path);
+            const extension = extname(base) || '.json';
+            const stem = basename(base, extension);
+            this.path = join(dirname(base), `${stem}.${safeScope(scope)}${extension}`);
+        }
+        else {
+            this.path = resolve(path ?? defaultCredentialPath(scope));
+        }
     }
     async load(baseUrl) {
         try {
             const value = JSON.parse(await readFile(this.path, 'utf8'));
-            return value.version === 1 && value.baseUrl === baseUrl && validToken(value.token)
+            return value.version === 1
+                && (this.scope !== undefined || value.baseUrl === baseUrl)
+                && validToken(value.token)
                 ? value.token
                 : undefined;
         }

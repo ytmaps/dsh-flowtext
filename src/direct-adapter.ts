@@ -7,11 +7,18 @@ import {
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import { startFlowTextRun, type FlowTextRunResult, type FlowTextRunSpec } from './run.js'
+import type { FlowTextClient } from './client.js'
+import type { FlowTextGatewayTarget } from './registry.js'
 
 /** Stable DSH route used when FlowText owns the whole task loop. */
 export const FLOWTEXT_DIRECT_PROVIDER = 'flowtext-direct'
 /** Display-only model id for the remote FlowText agent. */
 export const FLOWTEXT_DIRECT_MODEL = 'flowtext-agent'
+
+export interface FlowTextDirectTargetResolver {
+  list(): Promise<readonly FlowTextGatewayTarget[]>
+  resolve(modelId: string, signal: AbortSignal): Promise<{ readonly target: FlowTextGatewayTarget; readonly client: FlowTextClient }>
+}
 
 function latestUserTask(options: GenerateOptions): string {
   const message = options.messages.findLast(item => item.role === 'user' && item.source.kind === 'user')
@@ -45,6 +52,7 @@ export class FlowTextDirectAdapter extends LlmAdapter {
     private readonly provider: string,
     private readonly model: string,
     private readonly spec: FlowTextRunSpec,
+    private readonly targets?: FlowTextDirectTargetResolver,
   ) {
     super()
   }
@@ -65,6 +73,22 @@ export class FlowTextDirectAdapter extends LlmAdapter {
   }
 
   override async listModels(provider: string): Promise<readonly LlmModelInfo[]> {
+    if (this.targets !== undefined) {
+      const targets = await this.targets.list()
+      if (targets.length > 0) {
+        const nameCounts = new Map<string, number>()
+        for (const target of targets) nameCounts.set(target.vaultName, (nameCounts.get(target.vaultName) ?? 0) + 1)
+        return targets.map(target => ({
+          provider,
+          id: target.modelId,
+          name: `FlowText Agent · ${target.vaultName}`,
+          description: (nameCounts.get(target.vaultName) ?? 0) > 1 && target.vaultPath
+            ? `FlowText 仓库：${target.vaultPath}`
+            : `FlowText 仓库：${target.vaultName}`,
+          inputModalities: ['text'],
+        }))
+      }
+    }
     return [{
       provider,
       id: this.model,
@@ -78,16 +102,22 @@ export class FlowTextDirectAdapter extends LlmAdapter {
     if (options.provider !== this.provider) {
       throw new Error(`flowtext-direct: unexpected provider route ${options.provider}`)
     }
-    if (options.model !== this.model) {
+    if (this.targets === undefined && options.model !== this.model) {
       throw new Error(`flowtext-direct: unsupported model ${options.model}`)
     }
     const signal = options.signal ?? new AbortController().signal
+    const resolvedTarget = this.targets === undefined
+      ? undefined
+      : await this.targets.resolve(options.model, signal)
+    if (resolvedTarget !== undefined) await resolvedTarget.client.verifyVault(resolvedTarget.target.vaultId, signal)
+    const runSpec = resolvedTarget === undefined ? this.spec : { ...this.spec, client: resolvedTarget.client }
     const request = {
       prompt: [{ type: 'text' as const, text: latestUserTask(options) }],
       signal,
     }
-    const run = await startFlowTextRun(request, this.spec, {
+    const run = await startFlowTextRun(request, runSpec, {
       ...(options.sessionId === undefined ? {} : { conversationId: String(options.sessionId) }),
+      ...(resolvedTarget === undefined ? {} : { vaultId: resolvedTarget.target.vaultId }),
     })
     try {
       let progressText = ''

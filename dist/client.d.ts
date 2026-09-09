@@ -7,6 +7,7 @@ export interface FlowTextClientOptions {
     readonly autoPair?: boolean;
     readonly clientId?: string;
     readonly clientName?: string;
+    readonly expectedVaultId?: string;
     readonly credentialStore?: FlowTextCredentialStore;
     readonly requestTimeoutMs: number;
     readonly longPollMs: number;
@@ -25,6 +26,8 @@ export declare class FlowTextClient {
     private token;
     private resolvingToken;
     constructor(options: FlowTextClientOptions);
+    /** Verify that a discovered loopback endpoint still belongs to the selected vault. */
+    verifyVault(vaultId: string, signal: AbortSignal): Promise<void>;
     private acquireToken;
     private pair;
     /** Create or recover an idempotent task. */

@@ -1,6 +1,6 @@
 {
   "name": "dsh-subagent-flowtext",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Run every DeepSeek Harness task directly in the FlowText Agent UI",
   "keywords": [
     "deepseek-harness",

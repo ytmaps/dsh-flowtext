@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { chmod, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, extname, join, resolve } from 'node:path'
 
 /** Persistence boundary for a FlowText Gateway credential. */
 export interface FlowTextCredentialStore {
@@ -16,10 +16,16 @@ interface CredentialFile {
   readonly token: string
 }
 
-function defaultCredentialPath(): string {
+function safeScope(value: string): string {
+  return value.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 128)
+}
+
+function defaultCredentialPath(scope?: string): string {
   const dshHome = process.env.DSH_HOME?.trim()
   const root = dshHome ? resolve(dshHome) : join(homedir(), '.dsh')
-  return join(root, 'credentials', 'dsh-subagent-flowtext.json')
+  return scope
+    ? join(root, 'credentials', 'dsh-subagent-flowtext', `${safeScope(scope)}.json`)
+    : join(root, 'credentials', 'dsh-subagent-flowtext.json')
 }
 
 function validToken(value: unknown): value is string {
@@ -29,15 +35,26 @@ function validToken(value: unknown): value is string {
 /** Mode-0600 local credential file, separate from profile configuration and repositories. */
 export class FileCredentialStore implements FlowTextCredentialStore {
   readonly path: string
+  private readonly scope: string | undefined
 
-  constructor(path = defaultCredentialPath()) {
-    this.path = resolve(path)
+  constructor(path?: string, scope?: string) {
+    this.scope = scope
+    if (path && scope) {
+      const base = resolve(path)
+      const extension = extname(base) || '.json'
+      const stem = basename(base, extension)
+      this.path = join(dirname(base), `${stem}.${safeScope(scope)}${extension}`)
+    } else {
+      this.path = resolve(path ?? defaultCredentialPath(scope))
+    }
   }
 
   async load(baseUrl: string): Promise<string | undefined> {
     try {
       const value = JSON.parse(await readFile(this.path, 'utf8')) as Partial<CredentialFile>
-      return value.version === 1 && value.baseUrl === baseUrl && validToken(value.token)
+      return value.version === 1
+        && (this.scope !== undefined || value.baseUrl === baseUrl)
+        && validToken(value.token)
         ? value.token
         : undefined
     } catch (error: unknown) {
@@ -70,4 +87,3 @@ export class FileCredentialStore implements FlowTextCredentialStore {
     })
   }
 }
-

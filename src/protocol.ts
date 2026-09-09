@@ -40,6 +40,7 @@ export interface FlowTextTaskContext {
 export interface FlowTextCreateTaskRequest {
   readonly clientId: string
   readonly requestId: string
+  readonly vaultId?: string
   readonly conversationId?: string
   readonly presentation?: 'background' | 'agent_view'
   readonly goal: string

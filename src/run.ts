@@ -173,7 +173,7 @@ async function waitForTerminal(
 export async function startFlowTextRun(
   request: FlowTextRunRequest,
   spec: FlowTextRunSpec,
-  context: { readonly conversationId?: string } = {},
+  context: { readonly conversationId?: string; readonly vaultId?: string } = {},
 ): Promise<FlowTextRun> {
   if (request.signal.aborted) throw new Error('subagent-flowtext: request was aborted before task creation')
   const goal = promptText(request.prompt)
@@ -183,6 +183,7 @@ export async function startFlowTextRun(
   const initial = await spec.client.createTask({
     clientId: spec.clientId,
     requestId,
+    ...(context.vaultId === undefined ? {} : { vaultId: context.vaultId }),
     conversationId,
     presentation: 'agent_view',
     goal,

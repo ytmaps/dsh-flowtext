@@ -65,11 +65,11 @@ function assertLoopbackBaseUrl(value) {
         url = new URL(value);
     }
     catch {
-        throw new Error('subagent-flowtext: baseUrl must be an absolute URL');
+        throw new Error('dsh-flowtext: baseUrl must be an absolute URL');
     }
     const loopback = url.hostname === '127.0.0.1' || url.hostname === 'localhost' || url.hostname === '[::1]';
     if (url.protocol !== 'http:' || !loopback || url.username || url.password || url.search || url.hash) {
-        throw new Error('subagent-flowtext: baseUrl must be a credential-free loopback http URL');
+        throw new Error('dsh-flowtext: baseUrl must be a credential-free loopback http URL');
     }
     return url.toString().replace(/\/$/, '');
 }
@@ -120,7 +120,7 @@ export class FlowTextClient {
         this.options = options;
         this.baseUrl = assertLoopbackBaseUrl(options.baseUrl);
         if (options.token !== undefined && options.token.length < 24) {
-            throw new Error('subagent-flowtext: token must contain at least 24 characters');
+            throw new Error('dsh-flowtext: token must contain at least 24 characters');
         }
         this.token = options.token;
     }

@@ -1,7 +1,7 @@
 # Install-time bundle: ready immediately; the first invocation securely pairs with FlowText.
 - insert:
     - id: flowtext-direct
-      name: dsh-subagent-flowtext
+      name: dsh-flowtext
       config:
         autoPair: true
         clientName: DeepSeek Harness

@@ -1,8 +1,8 @@
-# dsh-subagent-flowtext
+# dsh-flowtext
 
 [中文](README.zh.md)
 
-`dsh-subagent-flowtext` registers one DeepSeek Harness route: `flowtext-direct / flowtext-agent`. DSH receives the user instruction, renders a sanitized compact execution trace, and records the terminal answer. FlowText exclusively owns classification, planning, discovery, reads, writes, tools, clarification, approval, and finalization.
+`dsh-flowtext` registers one DeepSeek Harness route: `flowtext-direct`. DSH receives the user instruction, renders a sanitized compact execution trace, and records the terminal answer. FlowText exclusively owns classification, planning, discovery, reads, writes, tools, clarification, approval, and finalization.
 
 The plugin does not register a `SubagentProvider`, expose `subagent_flowtext`, or install `tool-subagent-flowtext`.
 
@@ -15,19 +15,19 @@ The plugin does not register a `SubagentProvider`, expose `subagent_flowtext`, o
 ## Install
 
 ```sh
-dsh plugin --profile web add github:ytmaps/dsh-subagent-flowtext
+dsh plugin --profile web add github:ytmaps/dsh-flowtext
 ```
 
 The bundled `cordis.patch.yml` creates only one Cordis entry:
 
 ```yaml
 - id: flowtext-direct
-  name: dsh-subagent-flowtext
+  name: dsh-flowtext
 ```
 
 No environment variable, token copy, or manual Profile edit is needed. FlowText automatically registers every open vault. The first task sent to each vault asks for local authorization in FlowText; DSH then stores and reuses a separate credential for that vault.
 
-If upgrading from `0.4.x` or earlier, remove the old package before adding it again so obsolete `subagent-flowtext` and `tool-subagent-flowtext` entries are cleared.
+When upgrading from `dsh-subagent-flowtext`, remove the old package before installing `dsh-flowtext`. Existing per-vault pairing credentials are migrated automatically, so no token needs to be copied again.
 
 ## Runtime behavior
 

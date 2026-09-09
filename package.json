@@ -1,6 +1,6 @@
 {
-  "name": "dsh-subagent-flowtext",
-  "version": "0.7.0",
+  "name": "dsh-flowtext",
+  "version": "0.8.0",
   "description": "Run every DeepSeek Harness task directly in the FlowText Agent UI",
   "keywords": [
     "deepseek-harness",
@@ -48,12 +48,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ytmaps/dsh-subagent-flowtext.git"
+    "url": "git+https://github.com/ytmaps/dsh-flowtext.git"
   },
   "bugs": {
-    "url": "https://github.com/ytmaps/dsh-subagent-flowtext/issues"
+    "url": "https://github.com/ytmaps/dsh-flowtext/issues"
   },
-  "homepage": "https://github.com/ytmaps/dsh-subagent-flowtext#readme",
+  "homepage": "https://github.com/ytmaps/dsh-flowtext#readme",
   "publishConfig": {
     "access": "public",
     "provenance": true

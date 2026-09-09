@@ -20,12 +20,12 @@ function safeScope(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 128)
 }
 
-function defaultCredentialPath(scope?: string): string {
+function defaultCredentialPath(scope?: string, namespace = 'dsh-flowtext'): string {
   const dshHome = process.env.DSH_HOME?.trim()
   const root = dshHome ? resolve(dshHome) : join(homedir(), '.dsh')
   return scope
-    ? join(root, 'credentials', 'dsh-subagent-flowtext', `${safeScope(scope)}.json`)
-    : join(root, 'credentials', 'dsh-subagent-flowtext.json')
+    ? join(root, 'credentials', namespace, `${safeScope(scope)}.json`)
+    : join(root, 'credentials', `${namespace}.json`)
 }
 
 function validToken(value: unknown): value is string {
@@ -36,9 +36,11 @@ function validToken(value: unknown): value is string {
 export class FileCredentialStore implements FlowTextCredentialStore {
   readonly path: string
   private readonly scope: string | undefined
+  private readonly legacyPath: string | undefined
 
   constructor(path?: string, scope?: string) {
     this.scope = scope
+    this.legacyPath = path === undefined ? resolve(defaultCredentialPath(scope, 'dsh-subagent-flowtext')) : undefined
     if (path && scope) {
       const base = resolve(path)
       const extension = extname(base) || '.json'
@@ -50,8 +52,17 @@ export class FileCredentialStore implements FlowTextCredentialStore {
   }
 
   async load(baseUrl: string): Promise<string | undefined> {
+    const current = await this.readMatching(this.path, baseUrl)
+    if (current !== undefined) return current
+    if (this.legacyPath === undefined) return undefined
+    const legacy = await this.readMatching(this.legacyPath, baseUrl)
+    if (legacy !== undefined) await this.save(baseUrl, legacy).catch(() => undefined)
+    return legacy
+  }
+
+  private async readMatching(path: string, baseUrl: string): Promise<string | undefined> {
     try {
-      const value = JSON.parse(await readFile(this.path, 'utf8')) as Partial<CredentialFile>
+      const value = JSON.parse(await readFile(path, 'utf8')) as Partial<CredentialFile>
       return value.version === 1
         && (this.scope !== undefined || value.baseUrl === baseUrl)
         && validToken(value.token)
@@ -64,7 +75,7 @@ export class FileCredentialStore implements FlowTextCredentialStore {
   }
 
   async save(baseUrl: string, token: string): Promise<void> {
-    if (!validToken(token)) throw new Error('subagent-flowtext: paired token is invalid')
+    if (!validToken(token)) throw new Error('dsh-flowtext: paired token is invalid')
     const directory = dirname(this.path)
     await mkdir(directory, { recursive: true, mode: 0o700 })
     const temporary = `${this.path}.${process.pid}.${randomUUID()}.tmp`
@@ -80,10 +91,12 @@ export class FileCredentialStore implements FlowTextCredentialStore {
   }
 
   async clear(baseUrl: string): Promise<void> {
-    const current = await this.load(baseUrl)
-    if (current === undefined) return
-    await unlink(this.path).catch((error: unknown) => {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    })
+    const paths = [this.path, ...(this.legacyPath === undefined ? [] : [this.legacyPath])]
+    for (const path of paths) {
+      if (await this.readMatching(path, baseUrl) === undefined) continue
+      await unlink(path).catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      })
+    }
   }
 }

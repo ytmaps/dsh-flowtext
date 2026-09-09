@@ -1,8 +1,8 @@
-# dsh-subagent-flowtext
+# dsh-flowtext
 
 [English](README.md)
 
-`dsh-subagent-flowtext` 为 DeepSeek Harness 注册唯一的 `flowtext-direct / flowtext-agent` 路由。DSH 只接收用户指令，显示脱敏的精简执行轨迹并记录最终答案；分类、规划、查找、读取、写入、工具执行、追问、审批及收尾全部由 Obsidian FlowText Agent 完成。
+`dsh-flowtext` 为 DeepSeek Harness 注册唯一的 `flowtext-direct` 路由。DSH 只接收用户指令，显示脱敏的精简执行轨迹并记录最终答案；分类、规划、查找、读取、写入、工具执行、追问、审批及收尾全部由 Obsidian FlowText Agent 完成。
 
 本插件不注册 `SubagentProvider`，不提供 `subagent_flowtext`，也不安装 `tool-subagent-flowtext`。
 
@@ -15,19 +15,19 @@
 ## 安装
 
 ```sh
-dsh plugin --profile web add github:ytmaps/dsh-subagent-flowtext
+dsh plugin --profile web add github:ytmaps/dsh-flowtext
 ```
 
 安装包自带 `cordis.patch.yml`，只创建一个 Cordis 条目：
 
 ```yaml
 - id: flowtext-direct
-  name: dsh-subagent-flowtext
+  name: dsh-flowtext
 ```
 
 无需环境变量、复制 Token 或手工编辑 Profile。FlowText 会自动注册每个已打开的仓库；首次向某个仓库提交任务时，FlowText 会显示本机连接确认。允许一次后，DSH 会按仓库分别保存凭据并自动复用。
 
-升级前若安装过 `0.4.x` 或更早版本，请先删除旧包再重新添加，以清除旧版产生的 `subagent-flowtext` 和 `tool-subagent-flowtext` 配置条目。
+从 `dsh-subagent-flowtext` 升级时，请先删除旧包，再安装 `dsh-flowtext`。旧版按仓库保存的配对凭据会自动迁移，无需重新复制 Token。
 
 ## 运行方式
 

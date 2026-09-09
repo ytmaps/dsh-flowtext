@@ -1,14 +1,14 @@
 # Publishing
 
 This directory is a standalone npm package and should be the root of the public
-GitHub repository `ytmaps/dsh-subagent-flowtext`.
+GitHub repository `ytmaps/dsh-flowtext`.
 
 ## Before the first release
 
 1. Confirm that the public GitHub repository URL exactly matches the
    `repository.url` in `package.json`.
 2. Use Node.js 24 and run `npm ci`, `npm test`, and `npm run pack:check`.
-3. Confirm that `dsh-subagent-flowtext` is still available on npm.
+3. Confirm that `dsh-flowtext` is still available on npm.
 4. Sign in to npm with publishing 2FA and publish the current version once from the public
    repository checkout:
 
@@ -24,7 +24,7 @@ type declarations, and package metadata.
 
 In the npm package settings, add a GitHub Actions trusted publisher with:
 
-- repository: `ytmaps/dsh-subagent-flowtext`
+- repository: `ytmaps/dsh-flowtext`
 - workflow: `publish.yml`
 - environment: leave unset
 

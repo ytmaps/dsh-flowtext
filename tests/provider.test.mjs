@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import { chmod, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
@@ -219,6 +219,29 @@ test('vault-scoped credentials survive a dynamic port change and stay isolated',
     assert.equal(await vaultA.load('http://127.0.0.1:39111/flowtext-agent/v1'), TOKEN)
     assert.equal(await vaultB.load('http://127.0.0.1:27124/flowtext-agent/v1'), undefined)
   } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('renamed plugin migrates legacy vault credentials and clears both locations', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-flowtext-credential-migration-'))
+  const previousDshHome = process.env.DSH_HOME
+  process.env.DSH_HOME = directory
+  try {
+    const vaultId = 'vault-migrate-1234'
+    const baseUrl = 'http://127.0.0.1:27124/flowtext-agent/v1'
+    const legacyPath = join(directory, 'credentials', 'dsh-subagent-flowtext', `${vaultId}.json`)
+    await mkdir(join(directory, 'credentials', 'dsh-subagent-flowtext'), { recursive: true })
+    await writeFile(legacyPath, JSON.stringify({ version: 1, baseUrl, token: TOKEN }), { mode: 0o600 })
+    const store = new FileCredentialStore(undefined, vaultId)
+    assert.equal(await store.load(baseUrl), TOKEN)
+    assert.equal(JSON.parse(await readFile(store.path, 'utf8')).token, TOKEN)
+    await store.clear(baseUrl)
+    await assert.rejects(readFile(store.path, 'utf8'), { code: 'ENOENT' })
+    await assert.rejects(readFile(legacyPath, 'utf8'), { code: 'ENOENT' })
+  } finally {
+    if (previousDshHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousDshHome
     await rm(directory, { recursive: true, force: true })
   }
 })

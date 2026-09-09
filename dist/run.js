@@ -42,13 +42,13 @@ function promptText(blocks) {
     const texts = [];
     for (const block of blocks) {
         if (block.type !== 'text')
-            throw new Error('subagent-flowtext: only text prompt blocks are supported');
+            throw new Error('dsh-flowtext: only text prompt blocks are supported');
         if (block.text.trim())
             texts.push(block.text);
     }
     const result = texts.join('\n\n').trim();
     if (!result)
-        throw new Error('subagent-flowtext: prompt must contain non-empty text');
+        throw new Error('dsh-flowtext: prompt must contain non-empty text');
     return result;
 }
 function safeDiagnostic(error) {
@@ -124,10 +124,10 @@ async function waitForTerminal(task, spec, signal, progress) {
  */
 export async function startFlowTextRun(request, spec, context = {}) {
     if (request.signal.aborted)
-        throw new Error('subagent-flowtext: request was aborted before task creation');
+        throw new Error('dsh-flowtext: request was aborted before task creation');
     const goal = promptText(request.prompt);
     if (utf8Bytes(goal) > spec.maxPromptBytes)
-        throw new Error('subagent-flowtext: prompt exceeds maxPromptBytes');
+        throw new Error('dsh-flowtext: prompt exceeds maxPromptBytes');
     const requestId = randomUUID();
     const conversationId = String(context.conversationId || requestId);
     const initial = await spec.client.createTask({

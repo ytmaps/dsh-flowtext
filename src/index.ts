@@ -69,7 +69,7 @@ type ResolvedConfig = Required<Omit<Config, 'baseUrl' | 'registryDir' | 'token' 
 
 function assertPositiveInteger(name: string, value: number, maximum: number): void {
   if (!Number.isSafeInteger(value) || value <= 0 || value > maximum) {
-    throw new Error(`dsh-subagent-flowtext: ${name} must be a positive safe integer no greater than ${maximum}`)
+    throw new Error(`dsh-flowtext: ${name} must be a positive safe integer no greater than ${maximum}`)
   }
 }
 
@@ -110,7 +110,7 @@ export function apply(ctx: Context, config: Config): void {
   assertPositiveInteger('maxPromptBytes', resolved.maxPromptBytes, 16 * 1024 * 1024)
   assertPositiveInteger('maxAnswerBytes', resolved.maxAnswerBytes, 16 * 1024 * 1024)
   if (resolved.token !== undefined && resolved.baseUrl === undefined) {
-    throw new Error('dsh-subagent-flowtext: token requires an explicit baseUrl; auto-discovered vaults pair independently')
+    throw new Error('dsh-flowtext: token requires an explicit baseUrl; auto-discovered vaults pair independently')
   }
 
   const createClient = (baseUrl: string, vaultId?: string): FlowTextClient => new FlowTextClient({
